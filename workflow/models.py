@@ -1,3 +1,4 @@
+import uuid as uuid_pkg
 from typing import Optional
 
 from sqlalchemy import Column, event
@@ -9,7 +10,7 @@ from api.core.models import TimestampModel, UUIDModel
 
 class Note(UUIDModel, TimestampModel, table=True):
     __tablename__ = "note"
-    user_id: str = Field(foreign_key = "user.uuid", index = True)
+    user_id: uuid_pkg.UUID = Field(foreign_key = "user.uuid", index = True)
     thread_id: str = Field(index=True)
     content: str
     embedding: list[float] = Field(sa_column=Column(Vector(1536)))

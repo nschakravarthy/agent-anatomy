@@ -1,0 +1,17 @@
+# Environment
+.env
+
+# Local SQLite (no longer used for migrations, kept out of VCS)
+test.db
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

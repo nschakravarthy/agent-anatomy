@@ -1,6 +1,11 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    # OS env vars (e.g. those set in the Dockerfile) take precedence over .env,
+    # so a local .env can point Alembic at the Dockerized Postgres without
+    # affecting the container, which gets DB_SERVER=postgres-db from its env.
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
     TITLE: str = "Nexus Backend"
     VERSION: str = "0.1.0"
     DESCRIPTION: str = "FastAPI backend for Otto, a personal research asssistant"
