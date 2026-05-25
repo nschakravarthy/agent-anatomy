@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # affecting the container, which gets DB_SERVER=postgres-db from its env.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    TITLE: str = "Nexus Backend"
+    TITLE: str = "Otto Backend"
     VERSION: str = "0.1.0"
     DESCRIPTION: str = "FastAPI backend for Otto, a personal research asssistant"
     API_PREFIX: str = "/api/v1"

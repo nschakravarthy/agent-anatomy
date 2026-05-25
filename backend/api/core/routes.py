@@ -3,6 +3,7 @@ from fastapi.routing import APIRouter
 from api.core.config import Settings
 from api.core.models import HealthCheck
 from api.user.routes import router as user_router
+from api.chat.routes import router as chat_router
 
 router = APIRouter()
 
@@ -16,3 +17,4 @@ async def health_check() -> HealthCheck:
     )
 
 router.include_router(user_router, prefix="/user", tags=["user"])
+router.include_router(chat_router, prefix="/chat", tags=["chat"])

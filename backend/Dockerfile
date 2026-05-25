@@ -9,7 +9,10 @@
     PYTHONHASHSEED=random \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_DEFAULT_TIMEOUT=100 
+    PIP_DEFAULT_TIMEOUT=100
+    # NOTE: never put secrets (ANTHROPIC_API_KEY, etc.) here — Dockerfile ENV is
+    # baked into image layers and committed to git. Inject them at runtime via
+    # docker-compose `environment:` / a secrets manager. See docker-compose.yml.
 
     WORKDIR /tmp
     
