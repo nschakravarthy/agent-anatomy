@@ -8,11 +8,13 @@ services:
     depends_on:
       postgres-db:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in your shell or .env}
+      - DB_SERVER=postgres-db
     networks:
       - backend-network
-    
+
   postgres-db:
     image: pgvector/pgvector:pg15
     container_name: postgres-db
@@ -38,7 +40,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: nexus-frontend
+    container_name: frontend
     ports:
       - "80:80"
     depends_on:
