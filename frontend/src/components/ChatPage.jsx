@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { sendMessage } from '../api/client.js';
+import { getThreadMessages, sendMessage } from '../api/client.js';
 
 export default function ChatPage() {
   const { userId, logout } = useAuth();
@@ -8,6 +8,7 @@ export default function ChatPage() {
   const [threadId, setThreadId] = useState(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState('');
   const endRef = useRef(null);
 
@@ -44,6 +45,20 @@ export default function ChatPage() {
     setError('');
   };
 
+  const viewHistory = async () => {
+    if (!threadId || loadingHistory) return;
+    setError('');
+    setLoadingHistory(true);
+    try {
+      const rows = await getThreadMessages(threadId);
+      setMessages(rows.map((r) => ({ role: r.role, content: r.content })));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   return (
     <div className="chat-screen">
       <header className="chat-header">
@@ -53,6 +68,14 @@ export default function ChatPage() {
           {userId && <span className="user-chip" title={userId}>{userId.slice(0, 8)}</span>}
         </div>
         <div className="chat-header-actions">
+          <button
+            className="ghost-btn"
+            onClick={viewHistory}
+            disabled={!threadId || sending || loadingHistory}
+            title={threadId ? 'Reload this conversation from the server' : 'Send a message first to start a thread'}
+          >
+            {loadingHistory ? 'Loading…' : 'View history'}
+          </button>
           <button className="ghost-btn" onClick={startNewChat} disabled={sending}>
             New chat
           </button>

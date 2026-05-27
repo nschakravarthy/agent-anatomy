@@ -16,3 +16,14 @@ class Note(UUIDModel, TimestampModel, table=True):
     embedding: list[float] = Field(sa_column=Column(Vector(1536)))
     meta: dict = Field(default_factory=dict, sa_column=Column(JSONB))
 
+class Message(UUIDModel, TimestampModel, table = True):
+    user_id:uuid_pkg.UUID = Field(foreign_key = "user.uuid", index = True)
+    thread_id:str = Field(index = True)
+    role:str
+    content:str
+    tool_calls: list[dict] | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
+    tool_call_id: str | None = None
+    tool_name: str | None = None
+
+
+

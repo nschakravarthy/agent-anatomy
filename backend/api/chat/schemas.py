@@ -13,3 +13,9 @@ class ChatResponse(BaseModel):
     thread_id: uuid_pkg.UUID
     response: str
 
+class MessageRead(BaseModel):
+    role: str
+    content: str
+
+    model_config = {"from_attributes": True}
+

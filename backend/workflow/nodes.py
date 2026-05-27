@@ -11,6 +11,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage
 
 from workflow.state import AgentState
+from workflow.tools import tavily_search
 
 SYSTEM_PROMPT = (
     "You are Otto, a personal research assistant. Answer the user's questions "
@@ -19,21 +20,19 @@ SYSTEM_PROMPT = (
     "provided; if you are unsure, say so rather than guessing."
 )
 
+tools = [tavily_search]
+
 @lru_cache(maxsize=1)
 def get_model() -> ChatAnthropic:
-    """Build (once) the Claude client used by the generation node.
-
-    Opus 4.7 is the most capable model; adaptive thinking lets Claude decide how
-    much to reason per turn. Credentials are read from ANTHROPIC_API_KEY in the
-    environment. ``max_tokens`` stays at 16k to keep non-streaming calls under
-    the SDK's HTTP timeout. Construction is lazy so importing this module (e.g.
-    at app startup) does not require the API key — only invoking the node does.
-    """
     return ChatAnthropic(
         model="claude-opus-4-7",
         max_tokens=16000,
         thinking={"type": "adaptive"},
     )
+
+@lru_cache(maxsize=1)
+def get_model_with_tools() -> ChatAnthropic:
+    return get_model().bind_tools(tools)
 
 
 async def call_model(state: AgentState) -> dict:
@@ -53,5 +52,5 @@ async def call_model(state: AgentState) -> dict:
             }
         ]
     )
-    response = await get_model().ainvoke([system, *state["messages"]])
+    response = await get_model_with_tools().ainvoke([system, *state["messages"]])
     return {"messages": [response]}

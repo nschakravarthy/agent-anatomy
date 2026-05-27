@@ -2,12 +2,13 @@ import uuid as uuid_pkg
 
 from fastapi import HTTPException, Depends
 from fastapi import status as http_status
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from sqlalchemy import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from api.chat.schemas import ChatCreate
 from api.chat.models import Chat
+from workflow.models import Message
 from workflow.graph import get_graph
 
 async def create_chat(data: ChatCreate, session: AsyncSession):
@@ -72,3 +73,21 @@ async def generate_reply(
         config=config,
     )
     return _message_text(result["messages"][-1])
+
+async def load_history(user_id: uuid_pkg.UUID, thread_id: uuid_pkg.UUID, session: AsyncSession):
+    stmt = (
+        select(Message)
+        .where(Message.user_id == user_id, Message.thread_id == thread_id)
+        .order_by(Message.created_at)
+    )
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [
+        HumanMessage(content=r.content) if r.role == "user" else AIMessage(content=r.content)
+        for r in rows
+    ]
+
+async def save_turn(user_id: uuid_pkg.UUID, thread_id: str, user_text: str, assistant_text: str, session:AsyncSession):
+    session.add(Message(user_id=user_id, thread_id=thread_id, role="user", content=user_text))
+    session.add(Message(user_id=user_id, thread_id=thread_id, role="assistant", content=assistant_text))
+    await session.commit()

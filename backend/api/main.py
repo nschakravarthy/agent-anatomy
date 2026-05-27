@@ -7,12 +7,15 @@ import logging
 from api.core.config import settings
 from api.core.routes import router as main_router
 from api.core.middleware import AuthMiddleware
+from api.core.config import DB_ASYNC_CONNECTION_STR
+from workflow.graph import get_graph
 
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
+    
 
 def get_application() -> FastAPI:
     app = FastAPI(

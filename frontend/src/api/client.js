@@ -126,6 +126,10 @@ export function sendMessage(message, threadId) {
   return request('/chat', { method: 'POST', body });
 }
 
+export function getThreadMessages(threadId) {
+  return request(`/chat/threads/${encodeURIComponent(threadId)}/messages`);
+}
+
 export function healthCheck() {
   return request('/', { auth: false });
 }

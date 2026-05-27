@@ -9,9 +9,13 @@ from functools import lru_cache
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START, END
+from langgraph.prebuilt import ToolNode, tools_condition
 
 from workflow.nodes import call_model
 from workflow.state import AgentState
+from workflow.tools import tavily_search
+
+tools = [tavily_search]
 
 
 @lru_cache(maxsize=1)
@@ -30,6 +34,9 @@ def get_graph():
     """
     builder = StateGraph(AgentState)
     builder.add_node("call_model", call_model)
+    builder.add_node("tools", ToolNode(tools))
     builder.add_edge(START, "call_model")
+    builder.add_conditional_edges("call_model", tools_condition)
+    builder.add_edge("tools", "call_model")
     builder.add_edge("call_model", END)
     return builder.compile(checkpointer=MemorySaver())
