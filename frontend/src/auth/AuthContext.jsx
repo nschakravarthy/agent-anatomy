@@ -9,8 +9,13 @@ import {
 
 const AuthContext = createContext(null);
 
+// Roles the backend can hand back; mirrors api/user/models.py::UserRole.
+export const ROLES = { USER: 'user', ADMIN: 'admin' };
+
 export function AuthProvider({ children }) {
-  // Seed from localStorage so a refresh keeps the user logged in.
+  // Seed from localStorage so a refresh keeps the user logged in. The role
+  // arrives in the login/register response and is stored alongside the tokens,
+  // so it survives a reload without another round trip.
   const [auth, setAuth] = useState(() => loadAuth());
 
   // The API client dispatches "auth:logout" when a token refresh fails; mirror
@@ -40,9 +45,15 @@ export function AuthProvider({ children }) {
     setAuth(null);
   }, []);
 
+  // Anything not explicitly "admin" is treated as a plain user, so a missing or
+  // unrecognised role fails closed.
+  const role = auth?.role === ROLES.ADMIN ? ROLES.ADMIN : ROLES.USER;
+
   const value = {
     auth,
     userId: auth?.user_id ?? null,
+    role,
+    isAdmin: role === ROLES.ADMIN,
     isAuthenticated: Boolean(auth?.access_token),
     login,
     register,

@@ -116,6 +116,8 @@ export function register(email, password) {
   return request('/user/register', { method: 'POST', body: { email, password }, auth: false });
 }
 
+// The response carries the account's role, which saveAuth persists for the rest
+// of the session.
 export function login(email, password) {
   return request('/user/login', { method: 'POST', body: { email, password }, auth: false });
 }

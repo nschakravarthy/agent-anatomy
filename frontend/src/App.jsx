@@ -1,8 +1,9 @@
 import { useAuth } from './auth/AuthContext.jsx';
 import LoginPage from './components/LoginPage.jsx';
-import ChatPage from './components/ChatPage.jsx';
+import AppShell from './components/AppShell.jsx';
 
 export default function App() {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <ChatPage /> : <LoginPage />;
+  // AppShell owns the tab bar and picks which page to show for the role.
+  return isAuthenticated ? <AppShell /> : <LoginPage />;
 }

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { listAgents, sendMessage } from '../api/client.js';
 
 export default function ChatPage() {
-  const { userId, logout } = useAuth();
   const [messages, setMessages] = useState([]); // { role: 'user' | 'assistant', content }
   // { stage, agent, description }[] — whichever stages the backend actually has.
   const [agents, setAgents] = useState([]);
@@ -63,36 +61,28 @@ export default function ChatPage() {
 
   return (
     <div className="chat-screen">
-      <header className="chat-header">
-        <div className="chat-header-left">
-          <span className="brand-dot" />
-          <strong>Otto</strong>
-          {userId && <span className="user-chip" title={userId}>{userId.slice(0, 8)}</span>}
-        </div>
-        <div className="chat-header-actions">
-          <label className="stage-picker">
-            <span className="stage-label">Agent</span>
-            <select
-              className="stage-select"
-              value={stage}
-              onChange={(e) => setStage(e.target.value)}
-              disabled={sending || agents.length === 0}
-            >
-              {agents.map((a) => (
-                <option key={a.stage} value={a.stage} title={a.description}>
-                  {a.stage} · {a.agent}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="ghost-btn" onClick={startNewChat} disabled={sending}>
-            New chat
-          </button>
-          <button className="ghost-btn" onClick={logout}>
-            Log out
-          </button>
-        </div>
-      </header>
+      {/* Brand, role and log out now live in AppShell's header; this toolbar
+          keeps only the controls that belong to the conversation itself. */}
+      <div className="chat-toolbar">
+        <label className="stage-picker">
+          <span className="stage-label">Agent</span>
+          <select
+            className="stage-select"
+            value={stage}
+            onChange={(e) => setStage(e.target.value)}
+            disabled={sending || agents.length === 0}
+          >
+            {agents.map((a) => (
+              <option key={a.stage} value={a.stage} title={a.description}>
+                {a.stage} · {a.agent}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="ghost-btn" onClick={startNewChat} disabled={sending}>
+          New chat
+        </button>
+      </div>
 
       <main className="chat-body">
         {messages.length === 0 && !sending && (

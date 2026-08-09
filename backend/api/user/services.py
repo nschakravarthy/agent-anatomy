@@ -3,7 +3,7 @@ from fastapi import status as http_status
 from sqlalchemy import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from api.user.models import User
+from api.user.models import User, UserRole
 from api.user.schemas import UserCreate, UserResponse
 from api.user.utils import get_password_hash, create_access_token, verify_password, refresh_access_token
 
@@ -18,8 +18,14 @@ async def create_user(data: UserCreate, session: AsyncSession):
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     hashed_password = get_password_hash(data.password)
-    # Create User object
-    new_user = User(email = data.email, hashed_password = hashed_password)
+    # Create User object. The role is pinned here rather than left to the model
+    # default so that self-service registration can never mint an admin, even if
+    # the default changes.
+    new_user = User(
+        email = data.email,
+        hashed_password = hashed_password,
+        role = UserRole.USER,
+    )
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)
@@ -27,6 +33,7 @@ async def create_user(data: UserCreate, session: AsyncSession):
 
     return {
         "user_id": str(new_user.uuid),
+        "role": new_user.role,
         **tokens  # Spread the access_token, refresh_token, token_type, expires_in
     }
 
@@ -47,6 +54,7 @@ async def login_user(data: UserCreate, session: AsyncSession):
     tokens = create_access_token({"user_id": str(db_user.uuid)})
     return {
         "user_id": str(db_user.uuid),
+        "role": db_user.role,
         **tokens  # Spread the access_token, refresh_token, token_type, expires_in
     }
 
