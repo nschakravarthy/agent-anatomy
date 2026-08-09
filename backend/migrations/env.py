@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import SQLModel
 
 from api.user.models import User
-from workflow.models import Note
 from api.chat.models import Chat
 from api.core.config import DB_ASYNC_CONNECTION_STR
 

@@ -1,230 +1,155 @@
-# AI Agent Anatomy — Learning Project
+# Customer Support Agent
 
-A small but architecturally honest AI agent built to explore the core concepts of agent design hands-on. The goal isn't to ship a product — it's to make each piece of the "anatomy of an agent" concrete enough to reason about.
+A customer support agent whose behaviour is described entirely by a Pydantic data model — the `AgentSpec` — and executed by a runtime that reads it. Two agents for two different products share the runtime and differ only in their spec JSON.
 
-Built with **FastAPI**, **LangGraph**, **SQLModel**, **Alembic**, and **Postgres + pgvector**.
+## What this is
 
-## The anatomy this project explores
+A support agent for a mid-market SaaS product. It handles the request types you'd expect from that kind of desk: refunds, account access, plan changes, billing questions, feature clarifications, bug reports. Each request type is a resolution recipe with its own risk tier, its own confidence threshold to auto-answer, and its own escalation rules.
 
-### Core capabilities
-- **Instructions** — system prompt defining the agent's role and behaviour
-- **Knowledge** — user-scoped notes stored as embeddings in pgvector
-- **Tools** — atomic actions the agent can take (`web_search`, `save_note`, `retrieve_notes`)
-- **Skills** — compositions of tools with their own control flow (research a topic, answer from notes)
-- **Memory** — short-term (LangGraph checkpointer in Postgres) and long-term (the notes store)
+The architectural bet: **the agent is a spec interpreter, not a graph.** Everything the agent does — its instructions, its knowledge, its tools, its resolution recipes, its safety policies — lives in one Pydantic model. The runtime is a Python class that reads the spec and executes accordingly. Changing what the agent does means editing the spec, not the code.
 
-### Environment interaction
-- **Triggers** — FastAPI endpoints that kick off agent runs
-- **Surfaces** — REST API (and Swagger UI at `/docs`)
-- **Permissions** — JWT auth, per-user data scoping, per-tool authorization
+## What this is not
 
-### Observability & improvement
-- **Activity** — every tool call logged to Postgres via a LangGraph callback handler
-- **Analytics** — `/stats` endpoint surfaces per-user metrics
-- **Evals** — pytest-based scenarios that assert on tool choice and response content
+- **A production agent.** There's no real ticketing integration, no PII redaction worth the name, no cost controls, no auth on the API.
+- **A framework.** The `AgentSpec` is domain-specific to this project. It borrows the anatomy vocabulary — instructions, knowledge, tools, skills, memory, triggers, surfaces, permissions — but isn't trying to be a general-purpose agent SDK.
+- **Built on LangGraph or LangChain.** The runtime is hand-rolled Python. This is a deliberate choice, discussed below.
+
+## Why build it this way
+
+Three convictions drove the design.
+
+**The spec is the source of truth, not the code.** In most agent projects, behaviour is scattered across a graph definition, a system prompt file, a tool list, a routing function, a deployment config. Changing any of them requires knowing where to look. Here, everything about what the agent does lives in one Pydantic model. Reading `agent_spec.py` tells you what any agent built from it can and can't do.
+
+**Safety is structural, not advisory.** The `AgentSpec` has Pydantic validators that make certain unsafe configurations impossible to construct. A skill tagged `NEVER_AUTOMATE` cannot be set to auto-reply — the model raises at construction time. A write-effect tool cannot be registered without human approval. The 2FA reset flow is the anchor for this: it's the one skill the type system refuses to let auto-answer, no matter what an extraction pass or a well-meaning engineer proposes. Safety isn't a runtime check hoping to fire; it's a guarantee that unsafe specs don't exist.
+
+**Hand-rolling the runtime keeps the mechanics visible.** Agent frameworks abstract away exactly the things worth understanding — the ReAct loop, the classify-then-route pattern, the tool-call/tool-result dance, the context assembly step. Building a runtime from a bare LLM call means every mechanism has a story. When the runtime eventually gets refactored to use a graph framework, every abstraction the framework provides is one this project already built by hand.
 
 ## Architecture
 
 ```
-┌─────────────┐
-│  FastAPI    │  auth, /chat, /stats
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  StateGraph │  router → (search → summarise → save) | (retrieve → synthesise) → respond
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────────────────────────┐
-│  Postgres                           │
-│   ├─ users, notes, activity_log     │  ← SQLModel + Alembic
-│   ├─ checkpoints, checkpoint_writes │  ← LangGraph AsyncPostgresSaver
-│   └─ vector extension (pgvector)    │
-└─────────────────────────────────────┘
+                    ┌──────────────────┐
+                    │  agent_spec.py   │   Pydantic AgentSpec — the entire vocabulary
+                    │  (data model)    │   of what an agent can be
+                    └────────┬─────────┘
+                             │
+                    (specs/ *.json)
+                             │
+                             ▼
+┌────────────┐      ┌──────────────────┐      ┌──────────────┐
+│  FastAPI   │─────▶│   SpecAgent      │─────▶│  Anthropic   │
+│  routes    │      │   (runtime)      │      │  API         │
+└────────────┘      └──────┬───────────┘      └──────────────┘
+                           │
+                           ▼
+                  ┌────────────────────┐
+                  │  Tools registry    │
+                  │  Knowledge store   │
+                  │  Message history   │
+                  │  Audit log         │
+                  └────────────────────┘
 ```
 
-### Graph shape
+The `AgentSpec` is the interface between two halves of the system. On one side, a spec is produced — hand-authored today, extracted from a support ticket archive in the future. On the other side, a spec is executed — the `SpecAgent` runtime loads it, validates its safety, and interprets it against incoming messages.
 
-```
-            ┌─────────┐
-            │  router │
-            └────┬────┘
-                 │
-          ┌──────┴──────┐
-          ▼             ▼
-     ┌─────────┐   ┌──────────┐
-     │ search  │   │ retrieve │
-     └────┬────┘   └────┬─────┘
-          ▼             ▼
-     ┌─────────┐   ┌────────────┐
-     │summarise│   │ synthesise │
-     └────┬────┘   └────┬───────┘
-          ▼             │
-     ┌─────────┐        │
-     │save_note│        │
-     └────┬────┘        │
-          └──────┬──────┘
-                 ▼
-            ┌─────────┐
-            │ respond │
-            └─────────┘
-```
+### The runtime per message
 
-### State
+When a message arrives:
 
-```python
-class AgentState(TypedDict):
-    messages: Annotated[list, add_messages]
-    user_id: int
-    thread_id: str
-    route: str | None
-    search_results: list | None
-    retrieved_notes: list | None
-```
+1. **Classify** — the runtime uses the spec's list of resolution recipes to decide which one the message matches, with a confidence score.
+2. **Gate on confidence** — the spec's reasoning policy has two thresholds. Below the lower one, the agent escalates. Between the two, it asks a clarifying question. Above the upper one, it proceeds.
+3. **Gate on skill mode** — `ESCALATE_ONLY` skills route to a human regardless of confidence. This is where 2FA resets always end up.
+4. **Gate on deployment risk** — a skill flagged for auto-reply gets downgraded to draft-for-review if the deployment's risk ceiling doesn't allow it. A conservative deployment can run a permissive spec safely.
+5. **Assemble context** — pull the matched skill's referenced knowledge items and the relevant slice of message history.
+6. **Run the recipe** — for each step in the skill, invoke the referenced tool. Write-effect tools require human approval before firing.
+7. **Compose the reply** — one LLM call with instructions as system prompt, knowledge as context, tool outputs as evidence.
+8. **Audit** — every decision written to the log, per the spec's observability config.
 
-`user_id` flows through the graph so tool nodes can enforce authorization themselves, not just at the API edge.
+Each step maps to a small piece of the runtime, and each is driven by data from the spec.
+
+## The agent's domain
+
+The support agent handles a fixed set of request types:
+
+- **Refund requests** — inside vs. outside the refund window, plan-dependent rules, currency handling.
+- **Account access** — password resets (self-serve), 2FA resets (never auto-serve, always escalate).
+- **Plan changes** — upgrades (auto-serve), downgrades (auto-serve with a save-attempt), cancellations (draft-for-review).
+- **Billing questions** — invoice access, tax questions, payment method updates.
+- **Feature questions** — pointing to docs, distinguishing "how do I" from "does this exist".
+- **Bug reports** — triage, information gathering, escalation to engineering.
+
+Each becomes a `Skill` in the spec, with an explicit `risk_tier` and `response_mode`. Refund requests inside the window are low-risk and auto-serve; refund requests outside the window are medium-risk and draft-for-review. Plan cancellations are draft-for-review because the business wants a human to see them. 2FA resets are `NEVER_AUTOMATE`, enforced by the type system.
+
+## Where the spec comes from
+
+Different parts of the spec have different sources:
+
+- **Instructions, knowledge, resolution recipes, eval cases** are the kinds of thing extracted from a corpus of resolved support conversations. This project uses a hand-authored corpus, but the shape mirrors what a real extraction pipeline would produce.
+- **Tools** are hand-authored, informed by what the corpus shows humans doing during resolutions.
+- **Memory, triggers, surfaces, permissions, deployment policy** are configuration, chosen based on where the agent will run.
+- **Reasoning and observability** have sensible defaults with per-agent overrides.
+
+The extraction pipeline itself isn't part of this project. The `AgentSpec` is designed as the pipeline's output contract regardless.
 
 ## Stack
 
-| Layer            | Choice                                        |
-| ---------------- | --------------------------------------------- |
-| API              | FastAPI                                       |
-| Agent framework  | LangGraph (`StateGraph`)                      |
-| ORM              | SQLModel                                      |
-| Migrations       | Alembic                                       |
-| Database         | Postgres 16                                   |
-| Vector store     | pgvector (same Postgres instance)             |
-| Short-term memory| `AsyncPostgresSaver` (LangGraph checkpointer) |
-| Auth             | JWT (access + refresh tokens)                 |
+| Layer | Choice |
+| --- | --- |
+| API | FastAPI |
+| Spec model | Pydantic v2 |
+| LLM provider | Anthropic (Claude Opus 4.7) |
+| Runtime | Hand-rolled `SpecAgent` class |
+| Persistence | JSON files on disk |
+| Deployment | Local dev |
+
+**Deliberate omissions:** no LangChain, no LangGraph, no vector database, no message queue, no auth. Each of these earns its way in when a concrete need justifies it.
 
 ## Project layout
 
 ```
 .
-├── api/                       # FastAPI application
-│   ├── main.py                # app factory, CORS + auth middleware, lifespan
-│   ├── core/
-│   │   ├── config.py          # Settings, DB connection string, public-path whitelist
-│   │   ├── db.py              # async engine + session factory
-│   │   ├── models.py          # base SQLModel mixins (UUID, timestamps), HealthCheck
-│   │   ├── middleware.py      # JWT auth middleware
-│   │   └── routes.py          # root router, health check, mounts user routes
-│   └── user/
-│       ├── routes.py          # /register, /login, /refresh
-│       ├── services.py        # user creation, login, token refresh
-│       ├── schemas.py         # request/response Pydantic models
-│       ├── models.py          # User SQLModel
-│       └── utils.py           # password hashing (Argon2), JWT create/verify
-├── workflow/                  # LangGraph agent
-│   ├── state.py               # AgentState TypedDict
-│   └── models.py              # Note SQLModel (pgvector embedding)
-├── migrations/                # Alembic
-│   ├── versions/              # migration scripts
-│   ├── env.py
-│   ├── script.py.mako
-│   └── README
-├── alembic.ini
-├── docker-compose.yml
-├── Dockerfile
-├── nginx.conf
+├── agent_spec.py          # the Pydantic AgentSpec — the whole vocabulary
+├── spec_agent.py          # the SpecAgent runtime — interprets a spec
+├── api/
+│   └── main.py            # FastAPI routes
+├── specs/
+│   └── support.json       # the current agent's spec, saved as JSON
+├── tests/
 ├── pyproject.toml
-├── poetry.lock
-├── test.db                    # local SQLite fallback (used when DB_NAME is unset)
 └── README.md
 ```
 
 ## Getting started
 
 ### Prerequisites
-- Docker + Docker Compose
-- An LLM API key (Anthropic or OpenAI)
-- An embedding API key (OpenAI for `text-embedding-3-small`)
-- A web search API key (Tavily free tier works)
 
-### 1. Environment
+- Python 3.11+
+- Poetry
+- An Anthropic API key
 
-Create `.env`:
-
-```
-DATABASE_URL=postgresql+psycopg://postgres:dev@db:5432/agent
-JWT_SECRET=change-me
-ANTHROPIC_API_KEY=...
-OPENAI_API_KEY=...        # for embeddings
-TAVILY_API_KEY=...        # for web search
-```
-
-A single `DATABASE_URL` works for both SQLModel and the LangGraph checkpointer when using the `psycopg` driver.
-
-### 2. Bring it up
+### Setup
 
 ```bash
-docker compose up -d db
-alembic upgrade head
-docker compose up api
+poetry install
+export ANTHROPIC_API_KEY=sk-ant-...
+poetry run uvicorn api.main:app --reload
 ```
 
-The Alembic migration creates the `vector` extension, the app tables, and an HNSW index on `notes.embedding`. The LangGraph checkpointer creates its own tables on app startup via `AsyncPostgresSaver.setup()` (idempotent).
-
-### 3. Try it
+### Try it
 
 ```bash
-# Register
-curl -X POST localhost:8000/auth/register \
+curl -X POST localhost:8000/agents/support/chat \
   -H 'content-type: application/json' \
-  -d '{"email":"me@example.com","password":"hunter2"}'
-
-# Login
-TOKEN=$(curl -s -X POST localhost:8000/auth/login \
-  -H 'content-type: application/json' \
-  -d '{"email":"me@example.com","password":"hunter2"}' | jq -r .access_token)
-
-# Chat
-curl -X POST localhost:8000/chat \
-  -H "authorization: Bearer $TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"message":"Research the LangGraph checkpointer and save the key points."}'
+  -d '{"message": "I need to cancel my subscription"}'
 ```
 
-Or use Swagger at <http://localhost:8000/docs>.
+The response is a JSON object with the reply, the matched skill, the classification confidence, the response mode used, the tools invoked, and the full audit trail. The audit trail is the interesting part — it's the trace of every decision the runtime made, which is what makes the agent debuggable.
 
-## How each concept lives in the code
+## Prior art and influences
 
-| Concept       | Where to look                                                              |
-| ------------- | -------------------------------------------------------------------------- |
-| Instructions  | `app/nodes.py` — system prompt in the `respond` node                       |
-| Knowledge     | `notes` table + `app/memory.py`                                            |
-| Tools         | `app/tools.py`                                                             |
-| Skills        | `app/graph.py` — the branches off the router                               |
-| Memory        | Short-term: `AsyncPostgresSaver` in `main.py` lifespan; Long-term: `notes` |
-| Triggers      | `app/routes/chat.py` — synchronous HTTP trigger                            |
-| Surfaces      | FastAPI + `/docs`                                                          |
-| Permissions   | `app/auth.py` for the edge; `user_id` checks inside tool nodes             |
-| Activity      | `app/callbacks.py` writes to `activity_log`                                |
-| Analytics     | `app/routes/stats.py`                                                      |
-| Evals         | `tests/evals.py`                                                           |
+- The anatomy vocabulary borrows from public agent-anatomy framings circulating in 2025-26.
+- The idea of an agent spec as a validated data structure with structural safety guarantees is inspired by the Anthropic Skills feature, though the implementation here is different.
+- The hand-rolled runtime is a deliberate choice against frameworks, not against them — the mechanics being visible is the point.
 
-## Design notes & gotchas
+## License
 
-- **`metadata` is reserved by SQLAlchemy** — the column on `Note` is named `meta` in Python.
-- **Alembic doesn't autogenerate the pgvector extension or HNSW indexes** — these are hand-written in the first migration.
-- **The pgvector dimension is fixed at table creation** — currently `1536` for OpenAI `text-embedding-3-small`. Changing models means a migration.
-- **`thread_id` is namespaced server-side** as `f"{user_id}:{client_thread_id}"` so users can't read each other's conversation state from the checkpointer.
-- **Per-tool permissions** are enforced inside tool nodes, not just at the API boundary — this is what makes the permissions concept visible in agent behaviour rather than just HTTP responses.
-- **Activity logging uses a LangGraph callback handler** rather than per-node logging, so observability is architecturally separate from business logic.
-
-## Evals
-
-```bash
-pytest tests/evals.py -v
-```
-
-Each eval is a scenario: a fixed input, a test thread, and assertions about which tools were called and what the response contains. Not LangSmith-grade, but enough to notice regressions while iterating on prompts or graph shape.
-
-## What this is not
-
-- Production-ready (no rate limiting, minimal error handling, single-process)
-- A general-purpose agent framework (it's deliberately small)
-- Optimised (pgvector with HNSW is plenty fast for this scale, but no caching, no streaming yet)
-
-The goal was to fit one honest version of each concept into a couple of hours. Extending any of them — multi-turn evals, streaming responses, a real frontend, scheduled triggers, multi-agent orchestration — is the natural next step.
+MIT

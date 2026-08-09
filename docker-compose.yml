@@ -17,7 +17,6 @@ services:
 
   postgres-db:
     image: pgvector/pgvector:pg15
-    container_name: postgres-db
     environment:
       - POSTGRES_DB=testdb
       - POSTGRES_USER=testadmin
@@ -40,7 +39,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: frontend
     ports:
       - "80:80"
     depends_on:

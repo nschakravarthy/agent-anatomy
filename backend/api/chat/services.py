@@ -8,7 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from api.chat.schemas import ChatCreate
 from api.chat.models import Chat
-from workflow.graph import get_graph
+
 
 async def create_chat(data: ChatCreate, session: AsyncSession):
     if data.thread_id:
@@ -61,14 +61,4 @@ async def generate_reply(
     The graph's checkpointer keys conversation history on ``thread_id``, so only
     the new message is supplied; earlier turns are loaded automatically.
     """
-    graph = get_graph()
-    config = {"configurable": {"thread_id": str(thread_id)}}
-    result = await graph.ainvoke(
-        {
-            "messages": [HumanMessage(content=message)],
-            "user_id": str(user_id),
-            "thread_id": str(thread_id),
-        },
-        config=config,
-    )
-    return _message_text(result["messages"][-1])
+    return "Hello"
