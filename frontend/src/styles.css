@@ -188,7 +188,37 @@ button:disabled {
 
 .chat-header-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.stage-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.stage-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.stage-select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.stage-select:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.stage-select:disabled {
+  opacity: 0.6;
 }
 
 .ghost-btn {

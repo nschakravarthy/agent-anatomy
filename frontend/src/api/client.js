@@ -4,7 +4,7 @@
 //   1. The auth middleware expects `Authorization: Token <access_token>`
 //      (a literal "Token " prefix, not "Bearer"), so we always send that.
 //   2. There is no chat-history endpoint; conversation continuity is keyed on
-//      the thread_id the /chat response returns, which the caller threads back
+//      the thread_id the chat response returns, which the caller threads back
 //      into the next request.
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
@@ -120,10 +120,17 @@ export function login(email, password) {
   return request('/user/login', { method: 'POST', body: { email, password }, auth: false });
 }
 
-export function sendMessage(message, threadId) {
+// The stage segment is what routes the request to a given stage's agent; the
+// trailing name must match that stage's spec name.
+export function sendMessage(message, threadId, stage, agent) {
   const body = { message };
   if (threadId) body.thread_id = threadId;
-  return request('/chat', { method: 'POST', body });
+  const path = `/chat/agents/${encodeURIComponent(stage)}/${encodeURIComponent(agent)}`;
+  return request(path, { method: 'POST', body });
+}
+
+export function listAgents() {
+  return request('/chat/agents');
 }
 
 export function healthCheck() {

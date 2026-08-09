@@ -45,11 +45,12 @@ class AgentSpec(BaseModel):
 
     # model
     model: str = Field(
-        default="claude-opus-4-7",
+        default="claude-opus-5",
         description="Anthropic model identifier the runtime should call.",
     )
     max_tokens: int = Field(
-        default=1000,
+        # Caps thinking + reply together, so leave room for both.
+        default=4000,
         gt=0,
         description="Maximum output tokens per reply.",
     )

@@ -5,7 +5,7 @@ Verifies that:
     2. The runtime makes a real call and returns a non-empty string.
 
 Run with:
-    poetry run pytest agents/stage_01_bare_call/tests/smoke.py -v
+    poetry run pytest agents/stage_01/tests/smoke.py -v
 
 Requires ANTHROPIC_API_KEY to be set, since the test actually hits the API.
 """
@@ -17,7 +17,7 @@ import os
 
 import pytest
 
-from agents.stage_01_bare_call.agent import SPEC_PATH, SpecAgent
+from agents.stage_01.agent import SPEC_PATH, SpecAgent
 
 
 @pytest.mark.skipif(
