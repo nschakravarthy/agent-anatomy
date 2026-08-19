@@ -1,25 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { listAgents, sendMessage } from '../api/client.js';
+import { sendMessage } from '../api/client.js';
 
 export default function ChatPage() {
   const [messages, setMessages] = useState([]); // { role: 'user' | 'assistant', content }
-  // { stage, agent, description }[] — whichever stages the backend actually has.
-  const [agents, setAgents] = useState([]);
-  const [stage, setStage] = useState('');
   const [threadId, setThreadId] = useState(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const endRef = useRef(null);
-
-  useEffect(() => {
-    listAgents()
-      .then((found) => {
-        setAgents(found);
-        if (found.length > 0) setStage(found[0].stage);
-      })
-      .catch((err) => setError(err.message));
-  }, []);
 
   // Keep the latest message in view as the conversation grows.
   useEffect(() => {
@@ -29,12 +17,7 @@ export default function ChatPage() {
   const handleSend = async (e) => {
     e.preventDefault();
     const text = input.trim();
-    const selected = agents.find((a) => a.stage === stage);
     if (!text || sending) return;
-    if (!selected) {
-      setError('No agent available to send to.');
-      return;
-    }
 
     setError('');
     setInput('');
@@ -43,7 +26,7 @@ export default function ChatPage() {
     try {
       // Passing the existing threadId continues the server-side conversation;
       // the first call (threadId === null) starts a new one and returns its id.
-      const res = await sendMessage(text, threadId, selected.stage, selected.agent);
+      const res = await sendMessage(text, threadId);
       setThreadId(res.thread_id);
       setMessages((prev) => [...prev, { role: 'assistant', content: res.response }]);
     } catch (err) {
@@ -64,21 +47,6 @@ export default function ChatPage() {
       {/* Brand, role and log out now live in AppShell's header; this toolbar
           keeps only the controls that belong to the conversation itself. */}
       <div className="chat-toolbar">
-        <label className="stage-picker">
-          <span className="stage-label">Agent</span>
-          <select
-            className="stage-select"
-            value={stage}
-            onChange={(e) => setStage(e.target.value)}
-            disabled={sending || agents.length === 0}
-          >
-            {agents.map((a) => (
-              <option key={a.stage} value={a.stage} title={a.description}>
-                {a.stage} · {a.agent}
-              </option>
-            ))}
-          </select>
-        </label>
         <button className="ghost-btn" onClick={startNewChat} disabled={sending}>
           New chat
         </button>

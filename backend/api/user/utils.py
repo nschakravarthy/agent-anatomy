@@ -1,11 +1,8 @@
 import jwt
-import hashlib
-import bcrypt
 from datetime import datetime, timedelta
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
-from passlib.context import CryptContext
 
 from api.core.config import settings
 

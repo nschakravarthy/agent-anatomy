@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import Optional
 
-from sqlalchemy import Column, String, event
+from sqlalchemy import String
 from sqlmodel import Field, SQLModel
 
 from api.core.models import TimestampModel, UUIDModel

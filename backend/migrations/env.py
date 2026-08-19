@@ -1,9 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 
 from alembic import context
@@ -37,7 +35,6 @@ def run_migrations_offline():
        target_metadata=target_metadata,
        literal_binds=True,
        dialect_opts={"paramstyle": "named"},
-       include_object=filter_db_objects
    )
 
    with context.begin_transaction():

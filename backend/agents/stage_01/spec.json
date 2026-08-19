@@ -1,7 +1,0 @@
-{
-  "name": "support",
-  "description": "Answers customer support questions in a single turn.",
-  "version": "0.1",
-  "model": "claude-opus-5",
-  "max_tokens": 4000
-}

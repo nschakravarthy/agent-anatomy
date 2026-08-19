@@ -122,17 +122,12 @@ export function login(email, password) {
   return request('/user/login', { method: 'POST', body: { email, password }, auth: false });
 }
 
-// The stage segment is what routes the request to a given stage's agent; the
-// trailing name must match that stage's spec name.
-export function sendMessage(message, threadId, stage, agent) {
+// Omitting thread_id starts a new conversation; the response carries the id to
+// pass back on the next turn to continue it.
+export function sendMessage(message, threadId) {
   const body = { message };
   if (threadId) body.thread_id = threadId;
-  const path = `/chat/agents/${encodeURIComponent(stage)}/${encodeURIComponent(agent)}`;
-  return request(path, { method: 'POST', body });
-}
-
-export function listAgents() {
-  return request('/chat/agents');
+  return request('/chat/message', { method: 'POST', body });
 }
 
 export function healthCheck() {

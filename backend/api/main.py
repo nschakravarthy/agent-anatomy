@@ -6,7 +6,7 @@ import logging
 
 from api.core.config import settings
 from api.core.routes import router as main_router
-from api.core.middleware import AuthMiddleware, StageSelectorMiddleware
+from api.core.middleware import AuthMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,6 @@ def get_application() -> FastAPI:
     )
 
     app.add_middleware(AuthMiddleware)
-    app.add_middleware(StageSelectorMiddleware)
 
     app.include_router(main_router, prefix=settings.API_PREFIX)
 

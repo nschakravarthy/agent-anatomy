@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from api.user.schemas import (
@@ -7,7 +7,6 @@ from api.user.schemas import (
     UserCreate,
     UserResponse,
 )
-from api.user.models import User
 from api.user.services import create_user, login_user, refresh_user_token
 from api.core.db import get_async_session
 

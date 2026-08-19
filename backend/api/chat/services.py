@@ -1,13 +1,13 @@
 import uuid as uuid_pkg
 
-from fastapi import HTTPException, Depends
-from fastapi import status as http_status
-from langchain_core.messages import BaseMessage, HumanMessage
-from sqlalchemy import delete, select
+from fastapi import HTTPException
+from langchain_core.messages import BaseMessage
+from sqlalchemy import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from api.chat.schemas import ChatCreate
 from api.chat.models import Chat
+from agent.anatomy.service import handle_message
 
 
 async def create_chat(data: ChatCreate, session: AsyncSession):
@@ -61,4 +61,5 @@ async def generate_reply(
     The graph's checkpointer keys conversation history on ``thread_id``, so only
     the new message is supplied; earlier turns are loaded automatically.
     """
-    return "Hello"
+    response = await handle_message(agent = "support", message = message)
+    return response

@@ -1,6 +1,5 @@
 import uuid as uuid_pkg
 
-from sqlmodel import Field, SQLModel
 
 from api.core.models import TimestampModel, UUIDModel
 

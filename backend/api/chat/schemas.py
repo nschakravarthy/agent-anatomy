@@ -12,11 +12,3 @@ class ChatCreate(BaseModel):
 class ChatResponse(BaseModel):
     thread_id: uuid_pkg.UUID
     response: str
-    agent: str
-    stage: str
-
-class AgentInfo(BaseModel):
-    stage: str          # "stage-01"
-    agent: str          # the spec's name, used as the {name} path segment
-    description: str = ""
-

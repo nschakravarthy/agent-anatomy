@@ -1,0 +1,5 @@
+{
+  "description": "Customer support agent for Acme Cloud, a SaaS product used by small and mid-market teams.",
+  "model": "claude-opus-4-7",
+  "max_tokens": 1000
+}
