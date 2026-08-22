@@ -6,9 +6,12 @@ from __future__ import annotations
 
 import json
 
+from typing import List
 from pydantic import BaseModel, Field
 
 from agent.core.paths import agent_file
+from agent.anatomy.instructions.models import Instruction
+from agent.anatomy.instructions.loader import load as load_instructions
 
 def load_identity(agent_name: str) -> dict:
     """
@@ -32,13 +35,20 @@ class AgentSpec(BaseModel):
     model:str = Field(default = "claude-opus-4-7")
     max_tokens:int = Field(default = 1000, gt=0)
 
+    # Core capabilities
+    instructions: List[Instruction] = Field(default_factory = list)
+
     @classmethod
     def compose(cls, agent_name:str) -> "AgentSpec":
         """
         Assemble the specification into an agent
         """
         identity = load_identity(agent_name)
-        return cls(name = agent_name, **identity)
+        return cls(
+            name = agent_name, 
+            **identity,
+            instructions=load_instructions(agent_name)
+        )
     
     def coverage(self) -> dict[str, int]:
         """
